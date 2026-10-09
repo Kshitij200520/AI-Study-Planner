@@ -7,7 +7,12 @@ const nodemailer = require('nodemailer');
 const dns = require('dns');
 
 const lookupIPv4 = (hostname, options, callback) => {
-    return dns.lookup(hostname, { ...options, family: 4, all: false }, callback);
+    dns.resolve4(hostname, (err, addresses) => {
+        if (err || !addresses || !addresses.length) {
+            return dns.lookup(hostname, { ...options, family: 4 }, callback);
+        }
+        callback(null, addresses[0], 4);
+    });
 };
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
@@ -30,7 +35,10 @@ const sendResetOTPEmail = async (email, otp) => {
     try {
         const host = process.env.SMTP_HOST || 'smtp.gmail.com';
         const isGmail = host === 'smtp.gmail.com' || host === 'gmail';
-        const portsToTry = process.env.SMTP_PORT ? [Number(process.env.SMTP_PORT)] : (isGmail ? [465, 587] : [465, 587]);
+        const configuredPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : null;
+        const portsToTry = configuredPort
+            ? [configuredPort, configuredPort === 465 ? 587 : 465]
+            : (isGmail ? [465, 587] : [465, 587]);
 
         let sent = false;
         let lastError = null;
