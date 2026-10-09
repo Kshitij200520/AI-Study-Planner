@@ -3,6 +3,7 @@ import axios from 'axios';
 // Axios API client configuration with bearer token interceptor
 const api = axios.create({
   baseURL: (import.meta.env.VITE_API_URL || 'http://localhost:5001/api').replace(/\/$/, ''),
+  timeout: 20000,
 });
 
 api.interceptors.request.use((config) => {
