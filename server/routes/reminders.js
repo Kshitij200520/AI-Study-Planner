@@ -91,7 +91,7 @@ router.post('/test-email', aiRateLimit, async (req, res) => {
         res.json({ message: 'Test email sent to your account email address.' });
     } catch (error) {
         console.error('Reminder test email failed:', error.message);
-        res.status(error.status || 502).json({ error: error.status === 503 ? error.message : 'Could not send the test email. Check SMTP settings and try again later.' });
+        res.status(error.status || 502).json({ error: error.status === 503 ? error.message : `Could not send test email: ${error.message}` });
     }
 });
 

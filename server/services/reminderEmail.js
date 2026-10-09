@@ -10,12 +10,23 @@ const createTransporter = () => {
         error.status = 503;
         throw error;
     }
+    const host = process.env.SMTP_HOST;
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+
+    if (host === 'smtp.gmail.com' || host === 'gmail') {
+        return nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user, pass },
+        });
+    }
+
     const port = Number(process.env.SMTP_PORT || 587);
     return nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
+        host,
         port,
         secure: port === 465,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        auth: { user, pass },
     });
 };
 
