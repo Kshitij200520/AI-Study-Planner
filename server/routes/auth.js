@@ -28,35 +28,48 @@ const sendResetOTPEmail = async (email, otp) => {
     }
 
     try {
-        const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || 'smtp.gmail.com',
-            port: Number(process.env.SMTP_PORT || 587),
-            secure: Number(process.env.SMTP_PORT || 587) === 465,
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS,
-            },
-            lookup: lookupIPv4,
-            family: 4,
-            connectionTimeout: 10000,
-            greetingTimeout: 10000,
-            socketTimeout: 15000,
-        });
+        const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+        const isGmail = host === 'smtp.gmail.com' || host === 'gmail';
+        const portsToTry = process.env.SMTP_PORT ? [Number(process.env.SMTP_PORT)] : (isGmail ? [465, 587] : [465, 587]);
 
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM || process.env.SMTP_USER,
-            to: email,
-            subject: 'StudyAI Password Reset OTP',
-            text: `Your StudyAI password reset OTP is ${otp}. It is valid for 10 minutes.`,
-            html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h2>StudyAI Password Reset</h2>
-                    <p>Your OTP is:</p>
-                    <h3 style="letter-spacing: 2px; font-size: 28px;">${otp}</h3>
-                    <p>This OTP is valid for 10 minutes.</p>
-                </div>
-            `,
-        });
+        let sent = false;
+        let lastError = null;
+        for (const port of portsToTry) {
+            const transporter = nodemailer.createTransport({
+                host: isGmail ? 'smtp.gmail.com' : host,
+                port,
+                secure: port === 465,
+                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+                lookup: lookupIPv4,
+                family: 4,
+                connectionTimeout: 8000,
+                greetingTimeout: 8000,
+                socketTimeout: 10000,
+            });
+            try {
+                await transporter.sendMail({
+                    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+                    to: email,
+                    subject: 'StudyAI Password Reset OTP',
+                    text: `Your StudyAI password reset OTP is ${otp}. It is valid for 10 minutes.`,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; padding: 20px;">
+                            <h2>StudyAI Password Reset</h2>
+                            <p>Your OTP is:</p>
+                            <h3 style="letter-spacing: 2px; font-size: 28px;">${otp}</h3>
+                            <p>This OTP is valid for 10 minutes.</p>
+                        </div>
+                    `,
+                });
+                sent = true;
+                break;
+            } catch (err) {
+                lastError = err;
+            } finally {
+                transporter.close();
+            }
+        }
+        if (!sent) throw lastError || new Error('SMTP send failed');
 
         return { demoMode: false };
     } catch (error) {

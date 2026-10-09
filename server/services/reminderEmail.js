@@ -9,6 +9,25 @@ const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (character
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }[character]));
 
+const createTransporterForPort = (port) => {
+    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    const isGmail = host === 'smtp.gmail.com' || host === 'gmail';
+
+    return nodemailer.createTransport({
+        host: isGmail ? 'smtp.gmail.com' : host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+        lookup: lookupIPv4,
+        family: 4,
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000,
+    });
+};
+
 const createTransporter = () => {
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
         const error = new Error('SMTP is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS on the server.');
@@ -16,21 +35,9 @@ const createTransporter = () => {
         throw error;
     }
     const host = process.env.SMTP_HOST;
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-    const port = Number(process.env.SMTP_PORT || 587);
-
-    return nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465,
-        auth: { user, pass },
-        lookup: lookupIPv4,
-        family: 4,
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 15000,
-    });
+    const isGmail = host === 'smtp.gmail.com' || host === 'gmail';
+    const port = Number(process.env.SMTP_PORT || (isGmail ? 465 : 587));
+    return createTransporterForPort(port);
 };
 
 const buildReminderEmail = ({ user, pending, settings, now = new Date(), dashboardUrl }) => {
@@ -62,12 +69,36 @@ const buildReminderEmail = ({ user, pending, settings, now = new Date(), dashboa
 };
 
 const sendMail = async ({ to, subject, text, html }) => {
-    const transporter = createTransporter();
-    try {
-        return await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to, subject, text, html });
-    } finally {
-        transporter.close();
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        const error = new Error('SMTP is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS on the server.');
+        error.status = 503;
+        throw error;
     }
+    const host = process.env.SMTP_HOST;
+    const isGmail = host === 'smtp.gmail.com' || host === 'gmail';
+    const portsToTry = process.env.SMTP_PORT
+        ? [Number(process.env.SMTP_PORT)]
+        : (isGmail ? [465, 587] : [465, 587]);
+
+    let lastError = null;
+    for (const port of portsToTry) {
+        const transporter = createTransporterForPort(port);
+        try {
+            return await transporter.sendMail({
+                from: process.env.SMTP_FROM || process.env.SMTP_USER,
+                to,
+                subject,
+                text,
+                html,
+            });
+        } catch (err) {
+            lastError = err;
+            console.warn(`SMTP send attempt on port ${port} failed: ${err.message}. Trying fallback port...`);
+        } finally {
+            transporter.close();
+        }
+    }
+    throw lastError || new Error('All SMTP connection attempts failed.');
 };
 
 module.exports = { escapeHtml, createTransporter, buildReminderEmail, sendMail };
