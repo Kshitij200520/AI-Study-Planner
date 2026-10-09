@@ -23,20 +23,19 @@ const sendResetOTPEmail = async (email, otp) => {
     }
 
     try {
-        const isGmail = process.env.SMTP_HOST === 'smtp.gmail.com' || process.env.SMTP_HOST === 'gmail';
-        const transporter = nodemailer.createTransport(
-            isGmail
-                ? { service: 'gmail', auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } }
-                : {
-                    host: process.env.SMTP_HOST,
-                    port: Number(process.env.SMTP_PORT || 587),
-                    secure: Number(process.env.SMTP_PORT || 587) === 465,
-                    auth: {
-                        user: process.env.SMTP_USER,
-                        pass: process.env.SMTP_PASS,
-                    },
-                }
-        );
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: Number(process.env.SMTP_PORT || 587),
+            secure: Number(process.env.SMTP_PORT || 587) === 465,
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS,
+            },
+            family: 4,
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 15000,
+        });
 
         await transporter.sendMail({
             from: process.env.SMTP_FROM || process.env.SMTP_USER,
