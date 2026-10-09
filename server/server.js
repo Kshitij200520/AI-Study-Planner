@@ -22,6 +22,10 @@ const reminderRoutes = require('./routes/reminders');
 const { startReminderScheduler } = require('./services/reminderScheduler');
 const ReminderDelivery = require('./models/ReminderDelivery');
 
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'AI Study Planner API is running successfully' });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/planner', plannerRoutes);
 app.use('/api/assessments', assessmentRoutes);
