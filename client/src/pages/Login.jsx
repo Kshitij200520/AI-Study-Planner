@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/useAuth';
+import { useToast } from '../context/useToast';
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -67,6 +67,12 @@ export default function Login() {
             {loading ? <><div className="spinner" /> Logging in...</> : '🚀 Login'}
           </button>
         </form>
+
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <Link to="/forgot-password" style={{ color: 'var(--accent-violet)', fontWeight: 600, fontSize: '0.9rem' }}>
+            Forgot Password?
+          </Link>
+        </div>
 
         <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginTop: 24, fontSize: '0.9rem' }}>
           Don't have an account?{' '}

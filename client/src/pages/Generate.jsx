@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../context/useToast';
 
 const levels = ['Complete Beginner', 'Beginner', 'Intermediate', 'Advanced'];
 const durations = [7, 14, 21, 30];
@@ -13,7 +14,15 @@ const suggestions = [
 ];
 
 export default function Generate() {
-  const [form, setForm] = useState({ topic: '', durationDays: 14, currentKnowledgeLevel: 'Beginner' });
+  const [searchParams] = useSearchParams();
+  const assessmentId = searchParams.get('assessmentId');
+  const [form, setForm] = useState({
+    topic: searchParams.get('topic') || '',
+    durationDays: 14,
+    currentKnowledgeLevel: searchParams.get('level') || 'Beginner',
+    studyHoursPerDay: 2,
+    examDate: '',
+  });
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -24,7 +33,7 @@ export default function Generate() {
     setLoading(true);
     try {
       addToast('🤖 AI is generating your plan... this may take a few seconds', 'info');
-      const res = await api.post('/planner/generate', form);
+      const res = await api.post('/planner/generate', { ...form, ...(assessmentId ? { assessmentId } : {}) });
       addToast('🎉 Study plan created!', 'success');
       navigate(`/plan/${res.data._id}`);
     } catch (err) {
@@ -42,7 +51,7 @@ export default function Generate() {
           <div style={{ fontSize: '3rem', marginBottom: 12 }}>✨</div>
           <h1 className="generate-title gradient-text">Generate AI Study Plan</h1>
           <p className="generate-subtitle">
-            Tell us what you want to learn. Our AI (powered by Gemini) will craft a personalized roadmap for you.
+            Tell us what you want to learn. Groq AI will craft a personalized roadmap{assessmentId ? ' using your diagnostic results' : ''}.
           </p>
         </div>
 
@@ -76,6 +85,33 @@ export default function Generate() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="form-group">
+            <label className="label" htmlFor="study-hours">Available study time per day</label>
+            <input
+              id="study-hours"
+              className="input"
+              type="number"
+              min="0.5"
+              max="12"
+              step="0.5"
+              value={form.studyHoursPerDay}
+              onChange={(e) => setForm({ ...form, studyHoursPerDay: Number(e.target.value) })}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="label" htmlFor="exam-date">Exam date (optional)</label>
+            <input
+              id="exam-date"
+              className="input"
+              type="date"
+              min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+              value={form.examDate}
+              onChange={(e) => setForm({ ...form, examDate: e.target.value })}
+            />
           </div>
 
           {/* Duration */}

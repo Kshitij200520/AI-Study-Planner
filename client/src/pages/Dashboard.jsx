@@ -1,15 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import api from '../utils/api';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState(null);
+  const [progressSummary, setProgressSummary] = useState('');
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [dueRevisions, setDueRevisions] = useState([]);
+  const [reminderSettings, setReminderSettings] = useState(null);
 
   useEffect(() => {
-    api.get('/planner').then(res => setPlans(res.data)).finally(() => setLoading(false));
+    Promise.allSettled([
+      api.get('/planner').then((res) => setPlans(res.data)),
+      api.get('/analytics').then((res) => setAnalytics(res.data)),
+      api.get('/revisions/due').then((res) => setDueRevisions(res.data)),
+      api.get('/reminders/settings').then((res) => setReminderSettings(res.data)),
+      api.post('/analytics/summary').then((res) => setProgressSummary(res.data.summary)),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const totalDays = plans.reduce((sum, p) => sum + p.durationDays, 0);
@@ -17,12 +28,23 @@ export default function Dashboard() {
     ? Math.round(plans.reduce((sum, p) => sum + p.progress, 0) / plans.length)
     : 0;
   const completed = plans.filter(p => p.progress === 100).length;
+  const weeklyMax = Math.max(1, ...(analytics?.weeklyTrend || []).map((day) => day.completedTasks));
+
+  const refreshSummary = async () => {
+    setSummaryLoading(true);
+    try {
+      const response = await api.post('/analytics/summary');
+      setProgressSummary(response.data.summary);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
 
   const stats = [
     { icon: '📚', label: 'Total Plans', value: plans.length, color: '#7c3aed' },
-    { icon: '📅', label: 'Study Days',  value: totalDays,    color: '#06b6d4' },
-    { icon: '🎯', label: 'Avg Progress', value: `${avgProgress}%`, color: '#f59e0b' },
-    { icon: '✅', label: 'Completed',   value: completed,    color: '#22c55e' },
+    { icon: '📅', label: 'Scheduled Days', value: totalDays, color: '#06b6d4' },
+    { icon: '🎯', label: 'Average Plan Progress', value: `${avgProgress}%`, color: '#f59e0b' },
+    { icon: '✅', label: 'Completed Plans', value: completed, color: '#22c55e' },
   ];
 
   return (
@@ -40,10 +62,54 @@ export default function Dashboard() {
             Here's an overview of your learning journey.
           </p>
         </div>
-        <Link to="/generate" className="btn btn-primary" style={{ padding: '14px 28px' }}>
-          ✨ New Study Plan
-        </Link>
+        <div className="dashboard-actions">
+          <Link to="/syllabus" className="btn btn-secondary">Import syllabus</Link>
+          <Link to="/generate" className="btn btn-primary" style={{ padding: '14px 28px' }}>✨ New Study Plan</Link>
+        </div>
       </div>
+
+      <section className="intelligence-section">
+        <div className="intelligence-heading"><div><span className="eyebrow">LEARNING INTELLIGENCE</span><h2>Progress backed by your activity</h2></div><Link to="/assessment" className="btn btn-secondary">Take diagnostic</Link></div>
+        {analytics && <div className="intelligence-grid">
+          <article className="glass intelligence-card">
+            <h3>Task completion</h3>
+            <strong>{analytics.taskCompletion.completed} / {analytics.taskCompletion.total}</strong>
+            <p>{analytics.taskCompletion.completedToday} task completions today · {analytics.taskCompletion.completedThisWeek} this week</p>
+            <div className="progress-bar"><div className="progress-fill" style={{ width: `${analytics.taskCompletion.accuracyPercent}%` }} /></div>
+            <small>Current saved task checklist completion: {analytics.taskCompletion.accuracyPercent}%</small>
+          </article>
+          <article className="glass intelligence-card">
+            <h3>Diagnostic topic accuracy</h3>
+            {analytics.quizPerformance.topicPerformance.length ? analytics.quizPerformance.topicPerformance.slice(0, 5).map((item) => <div className="topic-metric" key={item.topic}><span>{item.topic}</span><strong>{item.accuracy}%</strong><div className="progress-bar"><div className="progress-fill" style={{ width: `${item.accuracy}%` }} /></div><small>{item.correct}/{item.total} correct · {item.attempts} attempt{item.attempts === 1 ? '' : 's'}</small></div>) : <p>No submitted diagnostic results yet.</p>}
+            <small>Accuracy is from submitted assessment answers, not task completion.</small>
+          </article>
+          <article className="glass intelligence-card trend-card">
+            <h3>Task completions · last 7 days</h3>
+            <div className="trend-chart" role="img" aria-label="Daily completed tasks during the past seven days">
+              {(analytics.weeklyTrend || []).map((day) => <div className="trend-day" key={day.date} title={`${day.date}: ${day.completedTasks} tasks`}><strong>{day.completedTasks}</strong><div className="trend-bar-track"><div className="trend-bar" style={{ height: `${(day.completedTasks / weeklyMax) * 100}%` }} /></div><small>{new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' })}</small></div>)}
+            </div>
+            <small>Based on saved task completion events.</small>
+          </article>
+          <article className="glass intelligence-card">
+            <h3>Topics to revisit</h3>
+            {analytics.weakTopics.length ? analytics.weakTopics.map((item) => <div className="weak-topic" key={item.topic}><span>{item.topic}</span><strong>{item.accuracy}% accuracy</strong></div>) : <p>{analytics.quizPerformance.submittedAssessments ? 'No topic is below 70% across recorded diagnostics.' : 'Complete a diagnostic to identify topics needing practice.'}</p>}
+            <h3 className="revision-title">Revisions due <span>{analytics.revisionsDue}</span></h3>
+            {dueRevisions.slice(0, 3).map((item) => <Link className="weak-topic due-topic" to={`/plan/${item.planId}`} key={item._id}><span>{item.topic}</span><strong>Review</strong></Link>)}
+            {analytics.revisionsDue > 0 && <Link className="btn btn-secondary" to="/revisions">Open revision queue</Link>}
+          </article>
+          <article className="glass intelligence-card summary-card">
+            <div className="intelligence-heading"><h3>Learning summary</h3><button className="btn btn-secondary" onClick={refreshSummary} disabled={summaryLoading}>{summaryLoading ? 'Updating…' : 'Refresh summary'}</button></div>
+            <p>{progressSummary || 'Your summary will appear when available.'}</p>
+            <small>{analytics.studyTime.message}</small>
+          </article>
+        </div>}
+      </section>
+
+      {reminderSettings && <section className={`dashboard-reminder-status glass ${reminderSettings.enabled ? 'enabled' : ''}`}>
+        <div className="reminder-status-icon"><span /></div>
+        <div className="dashboard-reminder-copy"><strong>{reminderSettings.enabled ? 'Daily reminders enabled' : 'Daily reminders are off'}</strong><small>{reminderSettings.enabled ? `Daily at ${reminderSettings.time} · ${reminderSettings.timezone}` : 'Get a reminder when scheduled tasks are still incomplete.'}</small></div>
+        <Link to="/settings/reminders" className="btn btn-secondary">Reminder settings</Link>
+      </section>}
 
       {/* Stats */}
       <div className="stats-grid">

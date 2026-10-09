@@ -1,15 +1,14 @@
-import { createContext, useContext, useState } from 'react';
-
-const ToastContext = createContext(null);
+import { useCallback, useState } from 'react';
+import { ToastContext } from './ToastState';
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = (message, type = 'info') => {
+  const addToast = useCallback((message, type = 'info') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
-  };
+  }, []);
 
   return (
     <ToastContext.Provider value={{ addToast }}>
@@ -22,5 +21,3 @@ export const ToastProvider = ({ children }) => {
     </ToastContext.Provider>
   );
 };
-
-export const useToast = () => useContext(ToastContext);
