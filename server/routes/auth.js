@@ -4,6 +4,11 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const dns = require('dns');
+
+const lookupIPv4 = (hostname, options, callback) => {
+    return dns.lookup(hostname, { ...options, family: 4, all: false }, callback);
+};
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
@@ -31,6 +36,7 @@ const sendResetOTPEmail = async (email, otp) => {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS,
             },
+            lookup: lookupIPv4,
             family: 4,
             connectionTimeout: 10000,
             greetingTimeout: 10000,
