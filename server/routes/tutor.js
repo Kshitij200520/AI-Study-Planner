@@ -68,7 +68,11 @@ router.post('/plans/:planId/messages', aiRateLimit, async (req, res) => {
         res.json({ conversationId: conversation._id, reply });
     } catch (error) {
         console.error('Tutor request failed:', error.message);
-        res.status(error.status || 502).json({ error: error.status === 503 ? error.message : 'The AI tutor is temporarily unavailable. Please try again.' });
+        const statusCode = error.status || 502;
+        const errorMessage = error.status === 429
+            ? 'AI rate limit reached. Please wait 5-10 seconds and try again.'
+            : (error.message || 'The AI tutor is temporarily unavailable. Please try again.');
+        res.status(statusCode).json({ error: errorMessage });
     }
 });
 

@@ -1,8 +1,8 @@
 const Groq = require('groq-sdk');
 
-const DEFAULT_MODELS = ['qwen/qwen3.8-27b', 'openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
+const DEFAULT_MODELS = ['openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'allam-2-7b', 'openai/gpt-oss-120b'];
 
-const getGroqModel = () => process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
+const getGroqModel = () => process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 
 const createGroqClient = () => {
     if (!process.env.GROQ_API_KEY) {
