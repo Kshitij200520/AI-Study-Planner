@@ -25,7 +25,7 @@ router.post('/plans/:planId/messages', aiRateLimit, async (req, res) => {
             task: String(rawContext.task || '').trim().slice(0, 300),
             objective: String(rawContext.objective || '').trim().slice(0, 300),
         };
-        if (message.length < 2 || message.length > 1200) return res.status(400).json({ error: 'Message must be 2 to 1200 characters long.' });
+        if (message.length < 1 || message.length > 1200) return res.status(400).json({ error: 'Message must be 1 to 1200 characters long.' });
         if (!styles[style]) return res.status(400).json({ error: 'Choose a supported explanation style.' });
         if (!process.env.GROQ_API_KEY) return res.status(503).json({ error: 'The AI tutor is not configured right now.' });
 
