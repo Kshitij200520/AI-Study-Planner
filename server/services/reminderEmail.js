@@ -74,6 +74,52 @@ const buildReminderEmail = ({ user, pending, settings, now = new Date(), dashboa
 };
 
 const sendMail = async ({ to, subject, text, html }) => {
+    // Resend HTTPS API (Port 443 - Bypasses cloud SMTP port blocking)
+    if (process.env.RESEND_API_KEY) {
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+            },
+            body: JSON.stringify({
+                from: process.env.SMTP_FROM || 'onboarding@resend.dev',
+                to: Array.isArray(to) ? to : [to],
+                subject,
+                text,
+                html,
+            }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || data.error?.message || 'Resend API send failed');
+        }
+        return data;
+    }
+
+    // Brevo HTTPS API (Port 443 - Bypasses cloud SMTP port blocking)
+    if (process.env.BREVO_API_KEY) {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'api-key': process.env.BREVO_API_KEY,
+            },
+            body: JSON.stringify({
+                sender: { email: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@studyai.app' },
+                to: [{ email: to }],
+                subject,
+                textContent: text,
+                htmlContent: html,
+            }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'Brevo API send failed');
+        }
+        return data;
+    }
+
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
         const error = new Error('SMTP is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS on the server.');
         error.status = 503;

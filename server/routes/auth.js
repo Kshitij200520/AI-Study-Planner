@@ -22,9 +22,11 @@ const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString()
 const sendResetOTPEmail = async (email, otp) => {
     const allowDemoMode = process.env.NODE_ENV !== 'production';
     const placeholderValues = ['your_email@gmail.com', 'your_app_password_here'];
-    const hasSmtpConfig = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS &&
+    const hasSmtpConfig = process.env.RESEND_API_KEY || process.env.BREVO_API_KEY || (
+        process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS &&
         !placeholderValues.includes(process.env.SMTP_USER) &&
-        !placeholderValues.includes(process.env.SMTP_PASS);
+        !placeholderValues.includes(process.env.SMTP_PASS)
+    );
 
     if (!hasSmtpConfig) {
         if (!allowDemoMode) throw new Error('SMTP is not configured');
@@ -33,6 +35,27 @@ const sendResetOTPEmail = async (email, otp) => {
     }
 
     try {
+        const textContent = `Your StudyAI password reset OTP is ${otp}. It is valid for 10 minutes.`;
+        const htmlContent = `<div style="font-family: Arial, sans-serif; padding: 20px;"><h2>StudyAI Password Reset</h2><p>Your OTP is:</p><h3 style="letter-spacing: 2px; font-size: 28px;">${otp}</h3><p>This OTP is valid for 10 minutes.</p></div>`;
+
+        if (process.env.RESEND_API_KEY) {
+            const res = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.RESEND_API_KEY}` },
+                body: JSON.stringify({ from: process.env.SMTP_FROM || 'onboarding@resend.dev', to: [email], subject: 'StudyAI Password Reset OTP', text: textContent, html: htmlContent }),
+            });
+            if (res.ok) return { demoMode: false };
+        }
+
+        if (process.env.BREVO_API_KEY) {
+            const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'api-key': process.env.BREVO_API_KEY },
+                body: JSON.stringify({ sender: { email: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@studyai.app' }, to: [{ email }], subject: 'StudyAI Password Reset OTP', textContent, htmlContent }),
+            });
+            if (res.ok) return { demoMode: false };
+        }
+
         const host = process.env.SMTP_HOST || 'smtp.gmail.com';
         const isGmail = host === 'smtp.gmail.com' || host === 'gmail';
         const configuredPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : null;
