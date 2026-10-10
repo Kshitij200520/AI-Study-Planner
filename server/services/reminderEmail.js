@@ -76,6 +76,10 @@ const buildReminderEmail = ({ user, pending, settings, now = new Date(), dashboa
 const sendMail = async ({ to, subject, text, html }) => {
     // Resend HTTPS API (Port 443 - Bypasses cloud SMTP port blocking)
     if (process.env.RESEND_API_KEY) {
+        let fromAddress = process.env.RESEND_FROM || 'onboarding@resend.dev';
+        if (process.env.SMTP_FROM && !process.env.SMTP_FROM.includes('@gmail.com') && !process.env.SMTP_FROM.includes('@yahoo.com') && !process.env.SMTP_FROM.includes('@hotmail.com') && !process.env.SMTP_FROM.includes('@outlook.com')) {
+            fromAddress = process.env.SMTP_FROM;
+        }
         const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
@@ -83,7 +87,7 @@ const sendMail = async ({ to, subject, text, html }) => {
                 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
             },
             body: JSON.stringify({
-                from: process.env.SMTP_FROM || 'onboarding@resend.dev',
+                from: fromAddress,
                 to: Array.isArray(to) ? to : [to],
                 subject,
                 text,

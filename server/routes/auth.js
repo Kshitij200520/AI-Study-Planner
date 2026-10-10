@@ -39,12 +39,18 @@ const sendResetOTPEmail = async (email, otp) => {
         const htmlContent = `<div style="font-family: Arial, sans-serif; padding: 20px;"><h2>StudyAI Password Reset</h2><p>Your OTP is:</p><h3 style="letter-spacing: 2px; font-size: 28px;">${otp}</h3><p>This OTP is valid for 10 minutes.</p></div>`;
 
         if (process.env.RESEND_API_KEY) {
+            let fromAddress = process.env.RESEND_FROM || 'onboarding@resend.dev';
+            if (process.env.SMTP_FROM && !process.env.SMTP_FROM.includes('@gmail.com') && !process.env.SMTP_FROM.includes('@yahoo.com') && !process.env.SMTP_FROM.includes('@hotmail.com') && !process.env.SMTP_FROM.includes('@outlook.com')) {
+                fromAddress = process.env.SMTP_FROM;
+            }
             const res = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.RESEND_API_KEY}` },
-                body: JSON.stringify({ from: process.env.SMTP_FROM || 'onboarding@resend.dev', to: [email], subject: 'StudyAI Password Reset OTP', text: textContent, html: htmlContent }),
+                body: JSON.stringify({ from: fromAddress, to: [email], subject: 'StudyAI Password Reset OTP', text: textContent, html: htmlContent }),
             });
             if (res.ok) return { demoMode: false };
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.message || data.error?.message || 'Resend API send failed');
         }
 
         if (process.env.BREVO_API_KEY) {
