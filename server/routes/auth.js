@@ -43,11 +43,12 @@ const sendResetOTPEmail = async (email, otp) => {
         let sent = false;
         let lastError = null;
         for (const port of portsToTry) {
+            const pass = String(process.env.SMTP_PASS || '').replace(/\s+/g, '');
             const transporter = nodemailer.createTransport({
                 host: isGmail ? 'smtp.gmail.com' : host,
                 port,
                 secure: port === 465,
-                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+                auth: { user: process.env.SMTP_USER, pass },
                 lookup: lookupIPv4,
                 family: 4,
                 connectionTimeout: 8000,
