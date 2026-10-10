@@ -130,7 +130,7 @@ router.post('/:id/generate', aiRateLimit, async (req, res) => {
         res.status(201).json(plan);
     } catch (error) {
         console.error('Syllabus plan generation failed:', error.message);
-        res.status(error.status || 502).json({ error: error.status === 503 ? error.message : 'Could not create a valid syllabus-aligned plan. Please review the outline or try again.' });
+        res.status(error.status || 502).json({ error: error.status === 503 ? error.message : `Could not create syllabus-aligned plan: ${error.message}` });
     }
 });
 

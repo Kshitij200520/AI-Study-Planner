@@ -50,13 +50,28 @@ const normalizeStudyPlan = (data, { topic, durationDays, studyHoursPerDay, requi
     });
 
     if (requiredTopics.length) {
-        const allowed = new Set(requiredTopics.map((value) => value.toLowerCase()));
-        const scheduled = new Set(dailyGoals.flatMap((goal) => goal.focusTopics.map((value) => value.toLowerCase())));
-        if (dailyGoals.some((goal) => !goal.focusTopics.length || goal.focusTopics.some((value) => !allowed.has(value.toLowerCase())))) {
-            throw new Error('AI returned topics outside the approved syllabus.');
-        }
-        if (requiredTopics.some((value) => !scheduled.has(value.toLowerCase()))) {
-            throw new Error('AI returned a schedule that does not cover every approved syllabus topic.');
+        const cleanTopic = (str) => String(str || '').replace(/^(?:[ivx]+\b[.)]?|\d+[.)]|[-*•]|\bI\b)\s*/i, '').replace(/[^\w\s]/g, '').trim().toLowerCase();
+        
+        const isMatch = (t1, t2) => {
+            const c1 = cleanTopic(t1);
+            const c2 = cleanTopic(t2);
+            if (!c1 || !c2) return false;
+            return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+        };
+
+        for (const goal of dailyGoals) {
+            if (!Array.isArray(goal.focusTopics) || !goal.focusTopics.length) {
+                throw new Error('AI returned topics outside the approved syllabus.');
+            }
+            const validTopics = [];
+            for (const ft of goal.focusTopics) {
+                const matched = requiredTopics.find((rt) => isMatch(ft, rt));
+                if (!matched) {
+                    throw new Error('AI returned topics outside the approved syllabus.');
+                }
+                validTopics.push(matched);
+            }
+            goal.focusTopics = [...new Set(validTopics)];
         }
     }
 
