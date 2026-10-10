@@ -1,6 +1,8 @@
 const Groq = require('groq-sdk');
 
-const getGroqModel = () => process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+const DEFAULT_MODELS = ['qwen/qwen3.8-27b', 'openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
+
+const getGroqModel = () => process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
 
 const createGroqClient = () => {
     if (!process.env.GROQ_API_KEY) {
@@ -9,6 +11,28 @@ const createGroqClient = () => {
         throw error;
     }
     return new Groq({ apiKey: process.env.GROQ_API_KEY });
+};
+
+const requestChatCompletion = async ({ messages, max_tokens = 1200, temperature = 0.5 }) => {
+    const client = createGroqClient();
+    const primaryModel = getGroqModel();
+    const candidateModels = [...new Set([primaryModel, ...DEFAULT_MODELS])];
+
+    let lastError = null;
+    for (const model of candidateModels) {
+        try {
+            return await client.chat.completions.create({
+                messages,
+                model,
+                temperature,
+                max_tokens,
+            });
+        } catch (error) {
+            lastError = error;
+            console.warn(`Groq chat call with model "${model}" failed: ${error.message}. Trying fallback model...`);
+        }
+    }
+    throw lastError || new Error('All Groq AI models failed');
 };
 
 const requestJson = async (systemPrompt, userPrompt, maxTokens = 4096) => {
@@ -51,4 +75,4 @@ const requestJson = async (systemPrompt, userPrompt, maxTokens = 4096) => {
     }
 };
 
-module.exports = { requestJson, getGroqModel, createGroqClient };
+module.exports = { requestJson, requestChatCompletion, getGroqModel, createGroqClient };
